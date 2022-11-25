@@ -124,12 +124,12 @@ public class ItemService {
         switch (SystemServiceConnector.getStatus(serverServiceName) == null ? ServiceStatus.Unknown : SystemServiceConnector.getStatus(serverServiceName)) {
             case Dead -> {
                 lore.add(Component.text(ChatColor.RED + ChatColor.ITALIC.toString() + "Offline"));
-                lore.add(Component.newline());
+                lore.add(Component.empty());
                 lore.add(Component.text(ChatColor.GRAY + "Click to start the server!"));
             }
             case Failed -> {
                 lore.add(Component.text(ChatColor.DARK_RED + ChatColor.ITALIC.toString() + "FAILED!"));
-                lore.add(Component.newline());
+                lore.add(Component.empty());
                 lore.add(Component.text(ChatColor.GRAY + "Please contact the server owner!"));
             }
             case Running -> {
