@@ -1,5 +1,7 @@
 # Raylcast.ODS
 A plugin that allows you to manage systemd services using ingame commands.
+The intended use case is to run this on your lobby server and configure your other servers using ODS. 
+Users can choose which one to play on, only that one will be running.
 
 ## Usage
 - Build plugin & put `.jar` into your `plugins` folder
