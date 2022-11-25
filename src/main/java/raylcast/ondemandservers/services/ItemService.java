@@ -15,6 +15,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.java.JavaPlugin;
+import raylcast.ondemandservers.models.ServiceDefinition;
 import raylcast.ondemandservers.models.ServiceStatus;
 
 import java.util.ArrayList;
@@ -24,12 +25,14 @@ public class ItemService {
 
     private final JavaPlugin Plugin;
     private final SystemServiceConnector SystemServiceConnector;
+    private final ConfigService ConfigService;
+
     private final List<Player> playersInUi = new ArrayList<>();
 
-
-    public ItemService(JavaPlugin plugin, raylcast.ondemandservers.services.SystemServiceConnector systemServiceConnector) {
+    public ItemService(JavaPlugin plugin, raylcast.ondemandservers.services.SystemServiceConnector systemServiceConnector, ConfigService configService) {
         Plugin = plugin;
         SystemServiceConnector = systemServiceConnector;
+        ConfigService = configService;
     }
 
 
@@ -49,36 +52,55 @@ public class ItemService {
 
 
     public void handleItemClick(int slot, Player player) {
-        String service = getServiceFromSlot(slot);
-        ServiceStatus status = SystemServiceConnector.getStatus(service) == null ? ServiceStatus.Unknown : SystemServiceConnector.getStatus(service);
+        var serviceDefinitionResult = ConfigService.getServiceDefinitions().stream()
+                .filter(x -> x.Slot == slot)
+                .findFirst();
 
-        switch (status) {
-            case Dead -> {
-                player.closeInventory();
-                SystemServiceConnector.startService(service);
-                player.sendMessage(ChatColor.GREEN + "Started Server " + service + "!");
-            }
-            case Running -> {
-                player.closeInventory();
-                SystemServiceConnector.stopService(service);
-                player.sendMessage(ChatColor.RED + "Stopped Server " + service + "!");
-            }
+        if (serviceDefinitionResult.isEmpty()){
+            return;
         }
+
+        var serviceDefinition = serviceDefinitionResult.get();
+        ServiceStatus status = SystemServiceConnector.getStatus(serviceDefinition.Identifier);
+
+        player.closeInventory();
+
+        if (status == ServiceStatus.Unknown || status == ServiceStatus.Failed){
+            player.sendMessage("This server is in an invalid state, Contact an administrator!");
+            return;
+        }
+
+
+
+        Bukkit.getScheduler().runTaskAsynchronously(Plugin, () -> {
+            switch (status) {
+                case Dead -> {
+                    player.sendMessage(ChatColor.BLUE + "Starting...");
+                    SystemServiceConnector.startService(serviceDefinition.Identifier);
+                    player.sendMessage(ChatColor.GREEN + "Started Server " + serviceDefinition.DisplayName + "!");
+                }
+                case Running -> {
+                    player.sendMessage(ChatColor.GOLD + "Stopping...");
+                    SystemServiceConnector.stopService(serviceDefinition.Identifier);
+                    player.sendMessage(ChatColor.RED + "Stopped Server " + serviceDefinition.DisplayName + "!");
+                }
+            }
+        });
     }
 
     public void addItemToPlayer(Player player) {
-        if (Plugin.getConfig().getBoolean("item.enabled") && player.hasPermission(getItemUsePerm())) {
-            player.getInventory().setItem(getItemSlot(), getItem());
+        if (!ConfigService.isHotbarItemEnabled()){
+            return;
         }
-    }
+        if (!player.hasPermission(getItemUsePerm())){
+            return;
+        }
 
-    public int getItemSlot() {
-        int slot = Plugin.getConfig().getInt("item.hotbarslot", 0);
-        return slot < 9 && slot >= 0 ? slot : 0;
+        player.getInventory().setItem(ConfigService.getHotbarItemSlot(), getItem());
     }
 
     public ItemStack getItem() {
-        ItemStack item = new ItemStack(Material.RECOVERY_COMPASS);
+        ItemStack item = new ItemStack(ConfigService.getHotbarItemMaterial());
         ItemMeta meta = item.getItemMeta();
         meta.displayName(getItemName());
         List<Component> lore = meta.lore();
@@ -91,37 +113,22 @@ public class ItemService {
 
     public Inventory getUi() {
         Inventory inv = Bukkit.createInventory(null, 9, Component.text(ChatColor.DARK_AQUA + "Server Manager"));
-        inv.setItem(0, getItemFromConfig(0));
-        inv.setItem(1, getItemFromConfig(1));
-        inv.setItem(2, getItemFromConfig(2));
-        inv.setItem(3, getItemFromConfig(3));
-        inv.setItem(4, getItemFromConfig(4));
-        inv.setItem(5, getItemFromConfig(5));
-        inv.setItem(6, getItemFromConfig(6));
-        inv.setItem(7, getItemFromConfig(7));
-        inv.setItem(8, getItemFromConfig(8));
-        return inv;
+
+        for(var serviceDefinition : ConfigService.getServiceDefinitions()){
+            inv.setItem(serviceDefinition.Slot, getItemFromServiceDefinition(serviceDefinition));
+        }
+
+        return  inv;
     }
 
+    private ItemStack getItemFromServiceDefinition(ServiceDefinition serviceDefinition) {
+        var item = new ItemStack(serviceDefinition.Material);
+        var meta = item.getItemMeta();
+        meta.displayName(Component.text(serviceDefinition.DisplayName));
 
-    private ItemStack getItemFromConfig(int i) {
-        ConfigurationSection section = Plugin.getConfig().getConfigurationSection("item." + i);
-        if (section == null) return new ItemStack(Material.AIR);
-        Material material = Material.SCULK_SHRIEKER;
-        String displayName = section.getString("displayName");
-        if (displayName == null) displayName = ChatColor.RESET + "Server " + i;
-        String serverServiceName = section.getString("serviceName");
-        try {
-            material = section.getString("material") == null ? Material.SCULK_SHRIEKER : Material.valueOf(section.getString("material"));
-        } catch (IllegalArgumentException ignored) {}
+        var lore = new ArrayList<Component>();
 
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text(displayName));
-        List<Component> lore = meta.lore();
-        if (lore == null) lore = new ArrayList<>();
-
-        switch (SystemServiceConnector.getStatus(serverServiceName) == null ? ServiceStatus.Unknown : SystemServiceConnector.getStatus(serverServiceName)) {
+        switch (SystemServiceConnector.getStatus(serviceDefinition.Identifier)) {
             case Dead -> {
                 lore.add(Component.text(ChatColor.RED + ChatColor.ITALIC.toString() + "Offline"));
                 lore.add(Component.empty());
@@ -141,15 +148,10 @@ public class ItemService {
             }
             case Unknown -> lore.add(Component.text(ChatColor.YELLOW + ChatColor.ITALIC.toString() + "Status Unknown"));
         }
+
         meta.lore(lore);
         item.setItemMeta(meta);
         return item;
-    }
-
-    private String getServiceFromSlot(int slot) {
-        ConfigurationSection section = Plugin.getConfig().getConfigurationSection("item." + slot);
-        if (section == null) section = Plugin.getConfig().createSection("item");
-        return section.getString("serviceName");
     }
 
     public Component getItemName() {

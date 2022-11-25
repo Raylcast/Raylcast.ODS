@@ -15,20 +15,25 @@ import java.util.Map;
 public class SystemServiceConnector {
     private final JavaPlugin Plugin;
     private final Runtime Runtime;
+    private final ConfigService ConfigService;
 
-    private final Map<String, ServiceStatus> Services;
+    private Map<String, ServiceStatus> Services;
 
-    public SystemServiceConnector(JavaPlugin plugin, String[] availableServices) {
+    public SystemServiceConnector(JavaPlugin plugin, ConfigService configService) {
         Plugin = plugin;
         Runtime = java.lang.Runtime.getRuntime();
-        Services = new HashMap<>();
+        ConfigService = configService;
 
-        for (String service : availableServices) {
-            Services.put(service, ServiceStatus.Unknown);
-        }
+        Services = new HashMap<>();
     }
 
-    public void enable() {
+    public void Enable() {
+        Services = new HashMap<>();
+
+        for(var serviceDefinition : ConfigService.getServiceDefinitions()){
+            Services.put(serviceDefinition.Identifier, ServiceStatus.Unknown);
+        }
+
         Bukkit.getScheduler().runTaskTimerAsynchronously(Plugin, () -> {
             try {
                 updateServices();

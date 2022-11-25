@@ -10,6 +10,7 @@ import raylcast.ondemandservers.listeners.InventoryClickListener;
 import raylcast.ondemandservers.listeners.PlayerInteractListener;
 import raylcast.ondemandservers.listeners.PlayerJoinListener;
 import raylcast.ondemandservers.services.CommandHandlerService;
+import raylcast.ondemandservers.services.ConfigService;
 import raylcast.ondemandservers.services.ItemService;
 import raylcast.ondemandservers.services.SystemServiceConnector;
 
@@ -22,47 +23,45 @@ public final class OnDemandServers extends JavaPlugin {
 
     private final SystemServiceConnector SystemServiceConnector;
     private final CommandHandlerService CommandHandlerService;
+    private final ConfigService ConfigService;
+
     public final ItemService ItemService;
 
     private LuckPerms LuckPerms;
-    private FileConfiguration Config;
 
     public OnDemandServers() {
         Logger = getLogger();
 
-        var services = new String[] {
-            "survival"
-        };
-
-        SystemServiceConnector = new SystemServiceConnector(this, services);
+        ConfigService = new ConfigService(this);
+        SystemServiceConnector = new SystemServiceConnector(this, ConfigService);
         CommandHandlerService = new CommandHandlerService(this, SystemServiceConnector);
-        ItemService = new ItemService(this, SystemServiceConnector);
+
+        ItemService = new ItemService(this, SystemServiceConnector, ConfigService);
     }
 
     @Override
     public void onLoad() {
         super.onLoad();
-        Config = getConfig();
-        Config.options().copyDefaults(true);
         saveConfig();
     }
 
     @Override
     public void onEnable() {
-        super.onEnable();
-
-        registerListeners();
         var registration = Bukkit.getServicesManager().getRegistration(LuckPerms.class);
 
         if (registration == null){
             throw new IllegalStateException("Can't enable the plugin without Luckperms installed!");
         }
 
+        super.onEnable();
+
+        ConfigService.Reload();
+        SystemServiceConnector.Enable();
+
+        registerListeners();
+
         LuckPerms = registration.getProvider();
         CommandHandlerService.onEnable();
-        Config = getConfig();
-
-        SystemServiceConnector.enable();
         ItemService.enable();
     }
 
