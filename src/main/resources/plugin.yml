@@ -1,0 +1,20 @@
+name: Raylcast.ODS
+version: '${project.version}'
+main: raylcast.ondemandservers.OnDemandServers
+api-version: 1.19
+load: STARTUP
+commands:
+  ods:
+    description: ODS Commands
+    usage: /ods [Subcommand]
+permissions:
+  raylcast.ods.command.ods:
+    default: false
+  raylcast.ods.command.ods.stop:
+    default: false
+  raylcast.ods.command.ods.start:
+    default: false
+  raylcast.ods.command.ods.status:
+    default: false
+depend:
+  - LuckPerms
