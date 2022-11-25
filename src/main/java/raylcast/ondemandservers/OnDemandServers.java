@@ -6,7 +6,11 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
+import raylcast.ondemandservers.listeners.InventoryClickListener;
+import raylcast.ondemandservers.listeners.PlayerInteractListener;
+import raylcast.ondemandservers.listeners.PlayerJoinListener;
 import raylcast.ondemandservers.services.CommandHandlerService;
+import raylcast.ondemandservers.services.ItemService;
 import raylcast.ondemandservers.services.SystemServiceConnector;
 
 import java.util.Arrays;
@@ -18,6 +22,7 @@ public final class OnDemandServers extends JavaPlugin {
 
     private final SystemServiceConnector SystemServiceConnector;
     private final CommandHandlerService CommandHandlerService;
+    public final ItemService ItemService;
 
     private LuckPerms LuckPerms;
     private FileConfiguration Config;
@@ -31,6 +36,7 @@ public final class OnDemandServers extends JavaPlugin {
 
         SystemServiceConnector = new SystemServiceConnector(this, services);
         CommandHandlerService = new CommandHandlerService(this, SystemServiceConnector);
+        ItemService = new ItemService(this, SystemServiceConnector);
     }
 
     @Override
@@ -45,6 +51,7 @@ public final class OnDemandServers extends JavaPlugin {
     public void onEnable() {
         super.onEnable();
 
+        registerListeners();
         var registration = Bukkit.getServicesManager().getRegistration(LuckPerms.class);
 
         if (registration == null){
@@ -56,6 +63,7 @@ public final class OnDemandServers extends JavaPlugin {
         Config = getConfig();
 
         SystemServiceConnector.enable();
+        ItemService.enable();
     }
 
     @Override
@@ -63,6 +71,13 @@ public final class OnDemandServers extends JavaPlugin {
         super.onDisable();
 
         CommandHandlerService.onDisable();
+        ItemService.disable();
+    }
+
+    public void registerListeners() {
+        Bukkit.getPluginManager().registerEvents(new PlayerJoinListener(this), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerInteractListener(this), this);
+        Bukkit.getPluginManager().registerEvents(new InventoryClickListener(this), this);
     }
 
     @Override
